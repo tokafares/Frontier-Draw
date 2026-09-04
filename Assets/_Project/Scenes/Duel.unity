@@ -258,6 +258,7 @@ GameObject:
   - component: {fileID: 579441612}
   - component: {fileID: 579441611}
   - component: {fileID: 579441610}
+  - component: {fileID: 579441614}
   m_Layer: 0
   m_Name: Duelist_A
   m_TagString: Untagged
@@ -360,6 +361,21 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 90, z: 0}
+--- !u!114 &579441614
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 579441609}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d4e0728b101912d469450a20d3a5ad17, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FrontierDraw.Player.PlayerInputHandler
+  moveLeftKey: 15
+  moveRightKey: 18
+  drawKey: 1
 --- !u!1 &961739749
 GameObject:
   m_ObjectHideFlags: 0
@@ -509,6 +525,7 @@ GameObject:
   - component: {fileID: 1917046003}
   - component: {fileID: 1917046002}
   - component: {fileID: 1917046001}
+  - component: {fileID: 1917046005}
   m_Layer: 0
   m_Name: Duelist_B
   m_TagString: Untagged
@@ -611,6 +628,21 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: -90, z: 0}
+--- !u!114 &1917046005
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1917046000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d4e0728b101912d469450a20d3a5ad17, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FrontierDraw.Player.PlayerInputHandler
+  moveLeftKey: 61
+  moveRightKey: 62
+  drawKey: 2
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
