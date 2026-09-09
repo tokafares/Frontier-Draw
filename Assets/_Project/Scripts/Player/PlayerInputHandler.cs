@@ -1,15 +1,20 @@
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
 namespace FrontierDraw.Player
 {
     /// <summary>
-    /// Reads raw keyboard input for one local player and exposes it as simple values.
+    /// Reads raw keyboard input for one player and exposes it as simple values.
     /// Does not move anything or know about duel rules - just "what is this player pressing".
-    /// Key bindings are set per-instance in the Inspector, so the same script works for
-    /// both duelists in local 2-player testing.
+    ///
+    /// Now a NetworkBehaviour: each duelist exists on both host and client, but only
+    /// the client that OWNS this object should read the local keyboard for it -
+    /// otherwise every machine would end up reading input for both duelists.
+    /// IsOwner is a NetworkBehaviour property: true only on the instance belonging
+    /// to whichever client (or the host) currently controls this object.
     /// </summary>
-    public class PlayerInputHandler : MonoBehaviour
+    public class PlayerInputHandler : NetworkBehaviour
     {
         [Header("Movement Keys")]
         [SerializeField] private Key moveLeftKey = Key.A;
@@ -33,6 +38,15 @@ namespace FrontierDraw.Player
 
         private void Update()
         {
+            // Not our object to control - stay neutral. (Also true before spawn/ownership
+            // is assigned, so this guard has to come before touching the keyboard.)
+            if (!IsOwner)
+            {
+                MoveDirection = 0f;
+                DrawPressedThisFrame = false;
+                return;
+            }
+
             var keyboard = Keyboard.current;
             if (keyboard == null)
             {

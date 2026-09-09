@@ -20,7 +20,15 @@ If this should instead become a single-player open-world adventure, say so — t
 
 **Design principle — keep the duel module portable.** This might later become part of a collaboration or get folded into someone else's game. That means the duel system (`DuelController`, `PlayerAimController`, `LockOnTarget`, `DrawSignalTimer`) should stay a self-contained module with minimal outside dependencies — it shouldn't reach into Frontier Draw–specific currency, rank, or menu code to function. Build it so it could be dropped into a different project's scene and still run with just a player reference and a "duel started" event. This costs almost nothing now (it's how we'd build it anyway for M1's local prototype) but keeps the door open later. Follow-on effect: don't over-invest art/UI effort on Frontier Draw–specific branding (menus, currency icons) during the MVP — put the polish budget into the duel *feel* itself, since that's the part that's valuable either way this goes.
 
-**Open question, still unresolved — networking approach.** The old Wild Noon proposal's stack (custom Node.js/WebSocket server + Redis matchmaking) was scoped for a funded 6–8 week team project. Building that from scratch solo is a serious multi-month undertaking on its own. Worth deciding fresh whether to build custom or use an existing multiplayer service for a solo MVP — I'll lay out that tradeoff properly once we reach M2 (Networking Layer), not before, since it doesn't block M0/M1.
+**Networking approach — DECIDED at M2 (2026-09-06).** The old Wild Noon proposal's stack (custom Node.js/WebSocket server + Redis matchmaking) was scoped for a funded 6–8 week team project and is a serious multi-month undertaking to build solo — ruled out for now.
+
+> **DECISION: Unity NGO (Netcode for GameObjects) + Unity Relay**, not Photon Fusion, not a custom Node.js/WebSocket server.
+>
+> **Why:** M2's actual goal right now is just proving two real devices can duel over the network — not perfect frame-accurate fairness yet. NGO is first-party, fits our existing Unity 6.3 setup, and has a free tier. We're also learning Unity/C# at the same time, so picking a second, unrelated networking SDK right now would mean learning two hard things at once.
+>
+> **Known limitation, deliberately deferred:** Photon Fusion has built-in client-side prediction and lag compensation specifically designed for reaction-timing-sensitive games like ours (where the whole mechanic is "who drew first"). NGO does not give us that out of the box — if we want draw-timing to be fair across different latencies, we'll need to build our own prediction/reconciliation on top of NGO later, or migrate that specific part to Fusion.
+>
+> **When to revisit:** Once we're playtesting with real people (around M6, or whenever real online tests start) — if a player reports losing a duel that felt like they drew first, that's the signal this needs real prediction/lag-compensation work. Don't preemptively build this now; it's a known limitation, not a blocker, for M2.
 
 ---
 
@@ -264,8 +272,8 @@ DrawSignalUI.prefab
 |---|---|---|
 | **M0 — Project Setup** | Empty Unity project, folder structure, Git repo, URP configured | Project opens clean, folders match Phase 4 |
 | **M1 — Local Draw Prototype** | Prove the core mechanic is fun with **two local players on one device/keyboard**, no networking yet | Two "characters" can circle-strafe, see red/green lock-on, wait for signal, tap to win/lose — all offline |
-| **M2 — Networking Layer** | Same duel, but over the network between two real devices | Two phones/emulators can duel each other through the backend (networking approach decided here, per Section 0) |
-| **M3 — Matchmaking** | Players queue and get auto-matched | No manual IP/room entry needed |
+| **M2 — Networking Layer** | Same duel, but over the network between two real devices | Two phones/emulators can duel each other through the backend — using **Unity NGO + Relay** (decided per Section 0); no prediction/lag-compensation yet, that's a deferred known limitation. **Raw connection confirmed working 2026-09-06** (Editor client ↔ standalone host, verified via `OnClientConnectedCallback` + live role/connected-clients readout on both sides). **Scope extended (2026-09-06):** M2 now also covers syncing actual duel gameplay — `DuelController` and the players become `NetworkObject`s, with position, the draw signal, and hit resolution synced over the network — not just a raw connection test. |
+| ~~**M3 — Matchmaking**~~ | ~~Players queue and get auto-matched~~ | **SKIPPED for now (decided 2026-09-06).** Not needed for the collaborator demo — manual two-instance join-code connection (from M2) is enough. Revisit if/when real matchmaking is actually needed. |
 | **M4 — Polish Pass 1** | Animations, VFX, SFX, "DRAW!" signal feel | Duel feels satisfying, not placeholder-gray |
 | **M5 — Currency & Basic Menu** | Win/loss record, simple currency reward | Persistent profile across sessions |
 | **M6 — MVP Playtest** | Real players test the MVP | Feedback collected before investing in P1/P2 features |
