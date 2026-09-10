@@ -2,6 +2,7 @@ using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using FrontierDraw.Core;
 using FrontierDraw.Networking;
 
 namespace FrontierDraw.UI
@@ -30,9 +31,32 @@ namespace FrontierDraw.UI
         [Header("MainMenuPanel")]
         [SerializeField] private GameObject mainMenuPanelRoot;
         [SerializeField] private Button playButton;
-        [Tooltip("Placeholder - no persisted profile yet (M5: Currency & Basic Menu not built).")]
+        [Tooltip("Now shows a rank title derived from PlayerStats.Wins (see RankData), not a " +
+                 "raw win/loss count. Field name kept as-is so the existing Inspector wiring " +
+                 "to the WinLossText object survives - only what it displays changed.")]
         [SerializeField] private Text winLossText;
         [SerializeField] private Button settingsButton;
+        [SerializeField] private Button mapButton;
+
+        [Header("PreDuelPanel (world-flavor screen shown before matchmaking)")]
+        [SerializeField] private GameObject preDuelPanelRoot;
+        [Tooltip("Placeholder - just a plain Image standing in for a real NPC portrait.")]
+        [SerializeField] private Text preDuelFlavorText;
+        [SerializeField] private Button continueButton;
+        [SerializeField] private Button preDuelBackButton;
+
+        [Header("MapPanel (static rank-tier map)")]
+        [SerializeField] private GameObject mapPanelRoot;
+        [Tooltip("The pin Image's RectTransform - moved between 3 preset spots based on rank tier.")]
+        [SerializeField] private RectTransform mapPinRectTransform;
+        [Tooltip("Anchored positions for tiers 0 (Drifter), 1 (Gunslinger), 2 (Legend), in order.")]
+        [SerializeField] private Vector2[] mapPinPositionsByTier = new Vector2[]
+        {
+            new Vector2(-150f, -80f),
+            new Vector2(0f, 40f),
+            new Vector2(160f, 120f),
+        };
+        [SerializeField] private Button mapBackButton;
 
         [Header("MatchmakingPanel")]
         [SerializeField] private GameObject matchmakingPanelRoot;
@@ -47,10 +71,14 @@ namespace FrontierDraw.UI
         {
             ShowMainMenu();
 
-            if (playButton != null) playButton.onClick.AddListener(ShowMatchmaking);
+            if (playButton != null) playButton.onClick.AddListener(ShowPreDuel);
+            if (continueButton != null) continueButton.onClick.AddListener(ShowMatchmaking);
+            if (preDuelBackButton != null) preDuelBackButton.onClick.AddListener(ShowMainMenu);
             if (cancelButton != null) cancelButton.onClick.AddListener(ShowMainMenu);
             if (hostButton != null) hostButton.onClick.AddListener(OnHostClicked);
             if (joinButton != null) joinButton.onClick.AddListener(OnJoinClicked);
+            if (mapButton != null) mapButton.onClick.AddListener(ShowMap);
+            if (mapBackButton != null) mapBackButton.onClick.AddListener(ShowMainMenu);
 
             // Placeholder - no SettingsPanel built yet.
             if (settingsButton != null)
@@ -59,22 +87,57 @@ namespace FrontierDraw.UI
                     Debug.Log("[MainMenu] Settings clicked - no SettingsPanel built yet (placeholder)."));
             }
 
+            RefreshRankTitle();
+        }
+
+        private void RefreshRankTitle()
+        {
+            // Re-read every time this panel shows (Awake fires fresh each time MainMenu.unity
+            // loads) so a win/loss recorded during the just-finished duel is reflected
+            // immediately, not just after a manual refresh.
             if (winLossText != null)
             {
-                winLossText.text = "Wins: 0  Losses: 0";
+                winLossText.text = RankData.GetTitle(PlayerStats.Wins);
             }
         }
 
         private void ShowMainMenu()
         {
             if (mainMenuPanelRoot != null) mainMenuPanelRoot.SetActive(true);
+            if (preDuelPanelRoot != null) preDuelPanelRoot.SetActive(false);
+            if (mapPanelRoot != null) mapPanelRoot.SetActive(false);
             if (matchmakingPanelRoot != null) matchmakingPanelRoot.SetActive(false);
+
+            RefreshRankTitle();
 
             // Cancelling out of matchmaking while hosting/waiting shouldn't leave a stale
             // subscription around for next time Host is clicked.
             if (NetworkManager.Singleton != null)
             {
                 NetworkManager.Singleton.OnClientConnectedCallback -= OnRemoteClientConnected;
+            }
+        }
+
+        private void ShowPreDuel()
+        {
+            if (mainMenuPanelRoot != null) mainMenuPanelRoot.SetActive(false);
+            if (preDuelPanelRoot != null) preDuelPanelRoot.SetActive(true);
+
+            if (preDuelFlavorText != null)
+            {
+                preDuelFlavorText.text = FlavorText.GetRandomLine();
+            }
+        }
+
+        private void ShowMap()
+        {
+            if (mainMenuPanelRoot != null) mainMenuPanelRoot.SetActive(false);
+            if (mapPanelRoot != null) mapPanelRoot.SetActive(true);
+
+            if (mapPinRectTransform != null && mapPinPositionsByTier.Length > 0)
+            {
+                int tier = Mathf.Clamp(RankData.GetTier(PlayerStats.Wins), 0, mapPinPositionsByTier.Length - 1);
+                mapPinRectTransform.anchoredPosition = mapPinPositionsByTier[tier];
             }
         }
 
@@ -89,6 +152,7 @@ namespace FrontierDraw.UI
         private void ShowMatchmaking()
         {
             if (mainMenuPanelRoot != null) mainMenuPanelRoot.SetActive(false);
+            if (preDuelPanelRoot != null) preDuelPanelRoot.SetActive(false);
             if (matchmakingPanelRoot != null) matchmakingPanelRoot.SetActive(true);
             SetStatus("Press Host to start a duel, or enter a join code and press Join.");
             if (hostJoinCodeText != null) hostJoinCodeText.text = "";

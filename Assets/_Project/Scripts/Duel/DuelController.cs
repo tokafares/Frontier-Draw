@@ -3,6 +3,7 @@ using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
+using FrontierDraw.Core;
 using FrontierDraw.Player;
 using FrontierDraw.UI;
 
@@ -381,6 +382,7 @@ namespace FrontierDraw.Duel
         private void ResolveDuelClientRpc(string outcome, DuelResult result)
         {
             PlayResolveEffects(result);
+            RecordLocalPlayerStats(result);
 
             if (resultPanel != null)
             {
@@ -503,6 +505,28 @@ namespace FrontierDraw.Duel
                     PlaySound(gunshotSound, placeholderGunshotBeep);
                     break;
             }
+        }
+
+        /// <summary>
+        /// World-flavor pass (presentational only): tallies a local win/loss into PlayerStats
+        /// so the MainMenu rank title/map pin have a real number behind them. Purely a side
+        /// effect of the ALREADY-DECIDED result - does not participate in, or change, how that
+        /// result was decided. Runs on every machine (host included) since each machine only
+        /// knows its own local player's win/loss from its own point of view. A tie records
+        /// nothing for either side.
+        /// </summary>
+        private void RecordLocalPlayerStats(DuelResult result)
+        {
+            bool localIsPlayerA = playerAInput != null && playerAInput.IsOwner;
+            bool localIsPlayerB = playerBInput != null && playerBInput.IsOwner;
+
+            bool localWon = (result == DuelResult.PlayerAWins && localIsPlayerA) ||
+                             (result == DuelResult.PlayerBWins && localIsPlayerB);
+            bool localLost = (result == DuelResult.PlayerAWins && localIsPlayerB) ||
+                              (result == DuelResult.PlayerBWins && localIsPlayerA);
+
+            if (localWon) PlayerStats.RecordWin();
+            else if (localLost) PlayerStats.RecordLoss();
         }
 
         /// <summary>Plays clip if assigned, otherwise falls back to the generated placeholder.</summary>
