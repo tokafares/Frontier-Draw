@@ -1,0 +1,39 @@
+# Git LFS tracking for Unity binary assets - keeps the regular git history
+# small by storing these large/binary files separately.
+# See: https://git-lfs.com
+
+# 3D models
+*.fbx filter=lfs diff=lfs merge=lfs -text
+*.obj filter=lfs diff=lfs merge=lfs -text
+*.blend filter=lfs diff=lfs merge=lfs -text
+
+# Textures / images
+*.png filter=lfs diff=lfs merge=lfs -text
+*.jpg filter=lfs diff=lfs merge=lfs -text
+*.jpeg filter=lfs diff=lfs merge=lfs -text
+*.tga filter=lfs diff=lfs merge=lfs -text
+*.tif filter=lfs diff=lfs merge=lfs -text
+*.tiff filter=lfs diff=lfs merge=lfs -text
+*.psd filter=lfs diff=lfs merge=lfs -text
+*.exr filter=lfs diff=lfs merge=lfs -text
+*.hdr filter=lfs diff=lfs merge=lfs -text
+
+# Audio
+*.wav filter=lfs diff=lfs merge=lfs -text
+*.mp3 filter=lfs diff=lfs merge=lfs -text
+*.ogg filter=lfs diff=lfs merge=lfs -text
+
+# Video
+*.mp4 filter=lfs diff=lfs merge=lfs -text
+
+# Fonts
+*.ttf filter=lfs diff=lfs merge=lfs -text
+*.otf filter=lfs diff=lfs merge=lfs -text
+
+# Unity-specific binary assets
+*.unitypackage filter=lfs diff=lfs merge=lfs -text
+
+# Unity text-serialized assets (.unity, .prefab, .mat, .asset, .controller) are
+# kept as regular git text files on purpose, NOT LFS - Unity saves these as
+# YAML when "Force Text" serialization mode is on (the project default), and
+# keeping them as text (not LFS) is what allows git to diff/merge them at all.
