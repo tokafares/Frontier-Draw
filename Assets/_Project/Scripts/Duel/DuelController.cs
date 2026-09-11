@@ -1,5 +1,6 @@
 using System.Collections;
 using Unity.Netcode;
+using Unity.Netcode.Components;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
@@ -50,9 +51,31 @@ namespace FrontierDraw.Duel
         [SerializeField] private PlayerInputHandler playerAInput;
         [SerializeField] private PlayerInputHandler playerBInput;
 
+        // Captured once in Awake, before any strafing/animation happens - every machine
+        // loads the same Duel.unity scene with the same starting transforms, so this is
+        // safe to capture locally on each machine rather than needing to network it.
+        // Used to snap both duelists back to their starting spot/facing on Rematch.
+        private Vector3 playerAStartPosition;
+        private Quaternion playerAStartRotation;
+        private Vector3 playerBStartPosition;
+        private Quaternion playerBStartRotation;
+
         [Header("Signal Timing")]
         [SerializeField] private float minDelaySeconds = 2f;
         [SerializeField] private float maxDelaySeconds = 5f;
+
+        [Header("Character Animation (Item 2 - Malbers/Mixamo character, local-only)")]
+        [Tooltip("Animator on Duelist_A's character model. Leave empty to skip animation " +
+                 "(e.g. still using the placeholder capsule) - camera shake/muzzle flash still play.")]
+        [SerializeField] private Animator playerAAnimator;
+        [Tooltip("Animator on Duelist_B's character model. Leave empty to skip animation.")]
+        [SerializeField] private Animator playerBAnimator;
+        [Tooltip("Animator trigger fired on both duelists the instant DRAW! shows (Idle -> Aim).")]
+        [SerializeField] private string drawTriggerName = "Draw";
+        [Tooltip("Animator trigger fired on the winning shooter when the duel resolves.")]
+        [SerializeField] private string shootTriggerName = "Shoot";
+        [Tooltip("Animator trigger fired on the losing duelist when the duel resolves.")]
+        [SerializeField] private string hitReactTriggerName = "HitReact";
 
         [Header("Placeholder Polish (Phase 5 assets not built yet)")]
         [Tooltip("Color of the full-screen flash shown the instant DRAW! fires.")]
@@ -130,6 +153,18 @@ namespace FrontierDraw.Duel
             {
                 resultPanel.RematchClicked += OnRematchClicked;
                 resultPanel.MainMenuClicked += OnMainMenuClicked;
+            }
+
+            if (playerAInput != null)
+            {
+                playerAStartPosition = playerAInput.transform.position;
+                playerAStartRotation = playerAInput.transform.rotation;
+            }
+
+            if (playerBInput != null)
+            {
+                playerBStartPosition = playerBInput.transform.position;
+                playerBStartRotation = playerBInput.transform.rotation;
             }
         }
 
@@ -278,6 +313,65 @@ namespace FrontierDraw.Duel
             {
                 resultPanel.Hide();
             }
+
+            // Runs on every machine (host directly here, non-host clients via
+            // HidePresentationClientRpc below) - resets whatever was left over from the
+            // previous duel (stuck Shoot/Death pose, strafed-away position) back to a
+            // clean Positioning state for the rematch.
+            ResetAnimatorToIdle(playerAAnimator);
+            ResetAnimatorToIdle(playerBAnimator);
+
+            // Position/rotation is owner-authoritative (see OwnerNetworkTransform) - only
+            // the client that owns a duelist is allowed to move its transform, so gate
+            // the reset the same way movement itself is gated, and let the sync out to
+            // everyone else happen the normal way.
+            //
+            // Uses NetworkTransform.Teleport(...) here rather than a raw
+            // transform.SetPositionAndRotation(...) - a direct transform write isn't
+            // flagged as a teleport, so non-owner observers (interpolating from wherever
+            // that duelist last was, mid-strafe) can visibly slide/overshoot toward the
+            // reset spot instead of snapping instantly. Teleport() tells every observer
+            // to snap immediately, which is what a rematch reset should look like.
+            ResetDuelistTransform(playerAInput, playerAStartPosition, playerAStartRotation);
+            ResetDuelistTransform(playerBInput, playerBStartPosition, playerBStartRotation);
+        }
+
+        /// <summary>Snaps a duelist back to its start position/rotation for a rematch, only if
+        /// this machine owns it (see HidePresentation). Uses NetworkTransform.Teleport(...)
+        /// instead of a raw transform write so every observer snaps instantly instead of
+        /// interpolating/overshooting - see the comment at the HidePresentation call site.</summary>
+        private static void ResetDuelistTransform(PlayerInputHandler duelist, Vector3 startPosition, Quaternion startRotation)
+        {
+            if (duelist == null || !duelist.IsOwner)
+            {
+                return;
+            }
+
+            var networkTransform = duelist.GetComponent<NetworkTransform>();
+            if (networkTransform != null)
+            {
+                networkTransform.Teleport(startPosition, startRotation, duelist.transform.localScale);
+            }
+            else
+            {
+                // Shouldn't happen (every duelist has OwnerNetworkTransform) but fall back
+                // to a raw write rather than silently doing nothing.
+                duelist.transform.SetPositionAndRotation(startPosition, startRotation);
+            }
+        }
+
+        /// <summary>Forces an Animator back to its default state (Pistol Idle) and clears any
+        /// pending triggers - Animator.SetTrigger alone can't get out of a state like Death that
+        /// has no outgoing transition, so Rebind is used instead of another trigger.</summary>
+        private static void ResetAnimatorToIdle(Animator animator)
+        {
+            if (animator == null)
+            {
+                return;
+            }
+
+            animator.Rebind();
+            animator.Update(0f);
         }
 
         [ClientRpc]
@@ -363,6 +457,8 @@ namespace FrontierDraw.Duel
             // already set locally in TickWaitingForSignal.
             StartCoroutine(DrawSignalFlashRoutine());
             PlaySound(drawSignalSound, placeholderDrawBeep);
+            TriggerAnimator(playerAAnimator, drawTriggerName);
+            TriggerAnimator(playerBAnimator, drawTriggerName);
 
             if (hudView != null)
             {
@@ -490,12 +586,16 @@ namespace FrontierDraw.Duel
                     SpawnMuzzleFlash(playerAInput);
                     PlaySound(gunshotSound, placeholderGunshotBeep);
                     StartCoroutine(CameraShakeRoutine());
+                    TriggerAnimator(playerAAnimator, shootTriggerName);
+                    TriggerAnimator(playerBAnimator, hitReactTriggerName);
                     break;
 
                 case DuelResult.PlayerBWins:
                     SpawnMuzzleFlash(playerBInput);
                     PlaySound(gunshotSound, placeholderGunshotBeep);
                     StartCoroutine(CameraShakeRoutine());
+                    TriggerAnimator(playerBAnimator, shootTriggerName);
+                    TriggerAnimator(playerAAnimator, hitReactTriggerName);
                     break;
 
                 case DuelResult.Tie:
@@ -503,6 +603,8 @@ namespace FrontierDraw.Duel
                     SpawnMuzzleFlash(playerAInput);
                     SpawnMuzzleFlash(playerBInput);
                     PlaySound(gunshotSound, placeholderGunshotBeep);
+                    TriggerAnimator(playerAAnimator, shootTriggerName);
+                    TriggerAnimator(playerBAnimator, shootTriggerName);
                     break;
             }
         }
@@ -527,6 +629,16 @@ namespace FrontierDraw.Duel
 
             if (localWon) PlayerStats.RecordWin();
             else if (localLost) PlayerStats.RecordLoss();
+        }
+
+        /// <summary>Fires an Animator trigger if an Animator is assigned - no-ops otherwise (e.g. a
+        /// duelist still using the placeholder capsule with no Animator wired in yet).</summary>
+        private static void TriggerAnimator(Animator animator, string triggerName)
+        {
+            if (animator != null && !string.IsNullOrEmpty(triggerName))
+            {
+                animator.SetTrigger(triggerName);
+            }
         }
 
         /// <summary>Plays clip if assigned, otherwise falls back to the generated placeholder.</summary>
@@ -572,8 +684,17 @@ namespace FrontierDraw.Duel
                 return;
             }
 
+            // Item 2: spawn at the revolver's actual muzzle tip once one is wired in
+            // (WeaponMuzzlePoint, attached under the character's hand/weapon socket).
+            // Falls back to the old "shooter position + up" placeholder for any duelist
+            // that doesn't have one yet, so this is safe to wire in one side at a time.
+            var muzzlePoint = shooter.GetComponentInChildren<WeaponMuzzlePoint>();
+            Vector3 spawnPosition = muzzlePoint != null
+                ? muzzlePoint.transform.position
+                : shooter.transform.position + Vector3.up;
+
             var flashObject = new GameObject("PlaceholderMuzzleFlash");
-            flashObject.transform.position = shooter.transform.position + Vector3.up;
+            flashObject.transform.position = spawnPosition;
 
             var light = flashObject.AddComponent<Light>();
             light.type = LightType.Point;
