@@ -2,6 +2,7 @@ using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using TMPro;
 using FrontierDraw.Core;
 using FrontierDraw.Networking;
 
@@ -63,7 +64,7 @@ namespace FrontierDraw.UI
         [SerializeField] private Button hostButton;
         [SerializeField] private Button joinButton;
         [SerializeField] private Button cancelButton;
-        [SerializeField] private InputField joinCodeInputField;
+        [SerializeField] private TMP_InputField joinCodeInputField;
         [SerializeField] private Text statusText;
         [SerializeField] private Text hostJoinCodeText;
 

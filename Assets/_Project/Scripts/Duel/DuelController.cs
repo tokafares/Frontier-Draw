@@ -113,6 +113,11 @@ namespace FrontierDraw.Duel
         [SerializeField] private ResultPanelView resultPanel;
         [Tooltip("Scene to load when Main Menu is clicked. Doesn't exist yet (M0/M1 only built the Duel scene) - this just warns instead of crashing until it does.")]
         [SerializeField] private string mainMenuSceneName = "MainMenu";
+        [Tooltip("Seconds to wait after the Shoot/HitReact animator triggers fire before the " +
+                 "ResultPanel appears - without this, the panel used to pop up in the same " +
+                 "instant as the triggers, covering the screen before the shoot/death animation " +
+                 "ever got a chance to play.")]
+        [SerializeField] private float resultPanelDelaySeconds = 7f;
 
         private DuelState state;
         private DrawSignalTimer signalTimer;
@@ -482,7 +487,7 @@ namespace FrontierDraw.Duel
 
             if (resultPanel != null)
             {
-                resultPanel.Show(outcome);
+                StartCoroutine(ShowResultPanelDelayed(outcome));
             }
 
             if (IsServer)
@@ -493,6 +498,15 @@ namespace FrontierDraw.Duel
             state = DuelState.Resolved;
             lastOutcome = outcome;
             Debug.Log($"[Duel] {outcome}");
+        }
+
+        /// <summary>Waits resultPanelDelaySeconds before showing the ResultPanel, so the
+        /// Shoot/HitReact animations triggered in PlayResolveEffects (above) get a chance to
+        /// actually play instead of being instantly covered by the winner/loser screen.</summary>
+        private IEnumerator ShowResultPanelDelayed(string outcome)
+        {
+            yield return new WaitForSeconds(resultPanelDelaySeconds);
+            resultPanel.Show(outcome);
         }
 
         // --- ResultPanel button actions ---
